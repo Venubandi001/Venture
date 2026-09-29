@@ -5,15 +5,15 @@ import { useState } from "react";
 const FAQS = [
   {
     q: "Is the availability shown really live?",
-    a: "Yes. Every time our team marks a plot on hold, reserved or sold in the admin console, the map and plot list update instantly for anyone viewing the page.",
+    a: "Yes. Every time our team marks a plot on hold, reserved or sold in the admin console, the map updates within seconds for everyone viewing it.",
   },
   {
     q: "Can I visit the site before booking?",
-    a: "Absolutely. Selecting any plot gives you a \"Request Site Visit\" option that reaches our sales team directly.",
+    a: "Absolutely. Selecting any plot shows a \"Book site visit\" button — pick a date and time slot and our sales team confirms it with you.",
   },
   {
     q: "What documents will I need for booking?",
-    a: "A valid ID and PAN are required to start a booking application. Our team will guide you through the rest during KYC.",
+    a: "A valid photo ID and PAN card are needed to book. Our team guides you through the paperwork after your site visit.",
   },
   {
     q: "Do the plots shown match the real boundaries?",
@@ -21,7 +21,7 @@ const FAQS = [
   },
   {
     q: "Can I pay in installments?",
-    a: "Yes, both self-funded and bank-finance payment plans are supported and can be discussed during the booking application.",
+    a: "Yes, both self-funded and bank-finance payment plans are supported and can be discussed with our sales team. Each plot also shows an estimated EMI.",
   },
 ];
 

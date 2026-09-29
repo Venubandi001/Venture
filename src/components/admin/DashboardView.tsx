@@ -1,93 +1,58 @@
-import { VentureProfile } from "@/lib/types";
-import AdminVentureMap from "./AdminVentureMap";
+"use client";
 
-const KPIS = [
-  { label: "Total ventures", value: "08", note: "2 launching soon" },
-  { label: "Applications received", value: "486", note: "+32 this week" },
-  { label: "Active leads", value: "214", note: "68 high intent" },
-  { label: "Site visits", value: "57", note: "12 scheduled" },
-  { label: "Bookings", value: "73", note: "₹24.8 Cr value" },
-  { label: "Collection", value: "₹8.6 Cr", note: "+11.4% this month" },
-];
+import { useEffect, useState } from "react";
+import type { AdminView } from "@/shared/adminViews";
+import type { BookingRow } from "@/shared/bookings";
+import { PLOT_STATUSES, STATUS_COLOR, STATUS_LABEL } from "@/shared/types";
+import { VENTURE_STATUS_LABEL } from "@/shared/ventures";
+import AdminLayoutMap from "./AdminLayoutMap";
+import { countPlots, isoDaysAgo, timeAgo, useAudit, useLayouts, useLeads } from "./adminData";
+import { useVentures, VentureSelect } from "./VenturesContext";
 
-const PORTFOLIO_CARDS: {
-  brand: string;
-  thumbClass: string;
-  badge: string;
-  loc: string;
-  plots: number;
-  available: number;
-  sold: number;
-  widths: [number, number, number, number];
-}[] = [
-  {
-    brand: "Green Valley",
-    thumbClass: "green-thumb",
-    badge: "REAL SATELLITE · 240 PLOTS",
-    loc: "Hyderabad · 18.42 acres · Survey No. 124",
-    plots: 240,
-    available: 126,
-    sold: 85,
-    widths: [52, 5, 8, 35],
-  },
-  {
-    brand: "Lakeview Enclave",
-    thumbClass: "lake-thumb",
-    badge: "REAL SATELLITE · 318 PLOTS",
-    loc: "Shamshabad · 24.8 acres · Airport Road",
-    plots: 318,
-    available: 204,
-    sold: 61,
-    widths: [64, 4, 13, 19],
-  },
-  {
-    brand: "Oak County",
-    thumbClass: "oak-thumb",
-    badge: "REAL SATELLITE · 412 PLOTS",
-    loc: "Yadadri · 31.2 acres · Temple Road",
-    plots: 412,
-    available: 330,
-    sold: 39,
-    widths: [80, 3, 7, 10],
-  },
-];
-
-const ACTIVITY = [
-  { text: "New application", meta: "Rahul K. · 3m" },
-  { text: "Site visit confirmed", meta: "Green Valley · 18m" },
-  { text: "Plot P-108 reserved", meta: "₹40L · 42m" },
-  { text: "Payment received", meta: "₹12.5L · 1h" },
-  { text: "New venture enquiry", meta: "Lakeview · 2h" },
-];
-
-export default function DashboardView({
-  profile,
-  onOpenVenture,
-}: {
-  profile: VentureProfile;
-  onOpenVenture: (name: string) => void;
+export default function DashboardView({ slug, onSelectVenture, onOpen, isAdmin }: {
+  slug: string;
+  onSelectVenture: (slug: string) => void;
+  onOpen: (view: AdminView, slug?: string) => void;
+  isAdmin: boolean;
 }) {
+  const { ventures } = useVentures();
+  const layouts = useLayouts(ventures);
+  const { leads } = useLeads();
+  const activity = useAudit("?limit=12");
+  const [bookings, setBookings] = useState<BookingRow[] | null>(null);
+  useEffect(() => { fetch("/api/bookings").then((r) => r.json()).then(setBookings).catch(() => setBookings([])); }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = isoDaysAgo(7);
+  const all = Object.values(layouts ?? {}).map(countPlots).filter(Boolean);
+  const sum = (k: keyof NonNullable<(typeof all)[number]>) => all.reduce((s, c) => s + (c ? c[k] : 0), 0);
+  const kpis = [
+    { label: "Live ventures", value: ventures.filter((v) => v.status === "live").length, note: `${ventures.length} in total`, go: "ventures" as AdminView },
+    { label: "Plots available", value: sum("available"), note: `of ${sum("total")} plots`, go: "inventory" as AdminView },
+    { label: "Booked / sold", value: sum("confirmed") + sum("received") + sum("sold"), note: `${sum("hold")} on hold`, go: "inventory" as AdminView },
+    { label: "Leads this week", value: leads ? leads.filter((l) => l.created_at >= weekAgo).length : "…", note: `${leads?.filter((l) => l.status === "new").length ?? 0} new to call`, go: "leads" as AdminView },
+    { label: "Upcoming visits", value: leads ? leads.filter((l) => l.kind === "visit" && (l.visit_date ?? "") >= today && l.status !== "lost").length : "…", note: `${leads?.filter((l) => l.visit_date === today).length ?? 0} today`, go: "visits" as AdminView },
+    { label: "Open bookings", value: bookings ? bookings.filter((b) => ["submitted", "received"].includes(b.status)).length : "…", note: `${bookings?.filter((b) => b.status === "confirmed").length ?? 0} confirmed`, go: "bookingApplications" as AdminView },
+  ];
+
   return (
     <section>
       <div className="admin-top">
         <div>
           <div className="eyebrow">Operations / Today</div>
           <h1>Venture control center</h1>
-          <p>
-            Manage every venture, plot, enquiry, application and site visit
-            from one place.
-          </p>
+          <p>Every number here is live from your ventures, plots, leads and bookings.</p>
         </div>
-        <div className="datepill">19 September 2026 · Live dashboard</div>
+        <div className="datepill">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
       </div>
 
       <div className="admin-kpis">
-        {KPIS.map((k) => (
-          <div className="admin-kpi" key={k.label}>
+        {kpis.map((k) => (
+          <button className="admin-kpi as-link" key={k.label} onClick={() => onOpen(k.go)}>
             <small>{k.label}</small>
-            <strong>{k.value}</strong>
+            <strong>{layouts === null && typeof k.value === "number" && k.go === "inventory" ? "…" : k.value}</strong>
             <span>{k.note}</span>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -95,71 +60,65 @@ export default function DashboardView({
         <div className="card">
           <div className="cardhead">
             <b>Venture portfolio</b>
-            <span>8 ventures · 1,426 plots</span>
+            <span>{ventures.length} ventures · {sum("total")} plots mapped</span>
           </div>
           <div className="venture-grid">
-            {PORTFOLIO_CARDS.map((c) => (
-              <div
-                className="venture-card"
-                key={c.brand}
-                onClick={() => onOpenVenture(c.brand)}
-              >
-                <div className={`venture-image satellite-thumb ${c.thumbClass}`}>
-                  <span className="image-badge">{c.badge}</span>
-                </div>
-                <div className="vcbody">
-                  <div className="vc-title-row">
-                    <h3>{c.brand}</h3>
-                    <span className="live-dot">LIVE</span>
+            {ventures.map((v) => {
+              const c = countPlots(layouts?.[v.slug]);
+              return (
+                <button className="venture-card as-link" key={v.slug} onClick={() => onOpen("ventures", v.slug)}>
+                  <div className="venture-image" style={v.coverUrl ? { backgroundImage: `url(${v.coverUrl})` } : undefined}>
+                    <span className="image-badge">{c ? `${c.total} PLOTS` : "NO LAYOUT YET"}</span>
                   </div>
-                  <p>{c.loc}</p>
-                  <div className="vcstats">
-                    <span>
-                      <b>{c.plots}</b> plots
-                    </span>
-                    <span>
-                      <b>{c.available}</b> available
-                    </span>
-                    <span>
-                      <b>{c.sold}</b> sold
-                    </span>
+                  <div className="vcbody">
+                    <div className="vc-title-row">
+                      <h3>{v.name}</h3>
+                      <span className={`live-dot ${v.status}`}>{VENTURE_STATUS_LABEL[v.status].replace(/ \(.*\)/, "").toUpperCase()}</span>
+                    </div>
+                    <p>{[v.city, v.acres ? `${v.acres} acres` : ""].filter(Boolean).join(" · ") || "—"}</p>
+                    {c ? (
+                      <>
+                        <div className="vcstats">
+                          <span><b>{c.available}</b> available</span>
+                          <span><b>{c.confirmed + c.received + c.sold}</b> booked/sold</span>
+                          <span><b>{c.hold}</b> hold</span>
+                        </div>
+                        <div className="statusbar" title={PLOT_STATUSES.map((s) => `${STATUS_LABEL[s]}: ${c[s]}`).join(" · ")}>
+                          {PLOT_STATUSES.map((s) => c[s] ? <i key={s} style={{ width: `${(c[s] / c.total) * 100}%`, background: STATUS_COLOR[s] }} /> : null)}
+                        </div>
+                      </>
+                    ) : <div className="vcstats"><span>{isAdmin ? "Upload the plan in Layouts & GIS" : "Layout not published yet"}</span></div>}
+                    <div className="venture-card-action">View venture details →</div>
                   </div>
-                  <div className="statusbar">
-                    <i className="av" style={{ width: `${c.widths[0]}%` }} />
-                    <i className="hd" style={{ width: `${c.widths[1]}%` }} />
-                    <i className="rs" style={{ width: `${c.widths[2]}%` }} />
-                    <i className="sd" style={{ width: `${c.widths[3]}%` }} />
-                  </div>
-                  <div className="venture-card-action">View venture details →</div>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="card">
           <div className="cardhead">
-            <b>Today&apos;s activity</b>
-            <span>Live</span>
+            <b>Recent activity</b>
+            {isAdmin ? <button className="pv-link-admin" onClick={() => onOpen("audit")}>Full audit log →</button> : null}
           </div>
           <div className="mini-list">
-            {ACTIVITY.map((a, i) => (
-              <p key={i}>
-                <span>
-                  <i className="activity-dot" />
-                  {a.text}
-                </span>
-                <small>{a.meta}</small>
+            {!activity ? <p>Loading…</p> : !activity.length ? <p>No activity yet.</p> : activity.map((a) => (
+              <p key={a.id}>
+                <span><i className="activity-dot" />{a.summary}</span>
+                <small>{a.userName} · {timeAgo(a.at)}</small>
               </p>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="section-title">
-        <h2>Live venture map</h2>
-        <p>Select a venture to see its satellite inventory and plot status.</p>
+      <div className="section-title map-title">
+        <div>
+          <h2>Live venture map</h2>
+          <p>Exactly what buyers see. Click a plot to change its status — it updates on the customer map within seconds.</p>
+        </div>
+        <VentureSelect className="map-venture-select" value={slug} onChange={onSelectVenture} />
       </div>
-      <AdminVentureMap profile={profile} />
+      <AdminLayoutMap key={slug} slug={slug} onOpenLayouts={isAdmin ? () => onOpen("layouts", slug) : undefined} />
     </section>
   );
 }

@@ -1,12 +1,12 @@
 const FEATURES = [
   { icon: "🛰️", title: "Live satellite view", desc: "Real Esri/Maxar satellite imagery draped over the actual venture boundary." },
   { icon: "📍", title: "GPS plot boundaries", desc: "Every plot is geo-tagged so buyers see the exact polygon on the ground." },
-  { icon: "🗂️", title: "Live inventory", desc: "Available, hold, reserved and sold status updates the moment your team acts." },
+  { icon: "🗂️", title: "Live inventory", desc: "Availability updates on every open map within seconds of your team changing a plot." },
   { icon: "📐", title: "Dimension cards", desc: "Width, depth, road access and facing shown the instant a plot is selected." },
-  { icon: "🧭", title: "Layout & satellite toggle", desc: "Switch between the master layout and real satellite imagery in one click." },
-  { icon: "📝", title: "Booking applications", desc: "Capture applicant, KYC and payment details without leaving the page." },
+  { icon: "🧭", title: "2D & 3D views", desc: "See the drawn layout flat over real satellite imagery, or tilt it into 3D." },
+  { icon: "📝", title: "Book a site visit", desc: "Pick a date and time slot for any plot — it reaches the sales team instantly." },
   { icon: "💬", title: "Instant enquiries", desc: "Site-visit requests and enquiries land straight in your admin console." },
-  { icon: "📊", title: "Admin control center", desc: "Manage every venture, plot, lead and payment from one dashboard." },
+  { icon: "📊", title: "Admin control center", desc: "Manage every venture, plot, lead and site visit from one dashboard." },
 ];
 
 export default function FeaturesGrid() {

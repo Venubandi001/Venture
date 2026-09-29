@@ -29,5 +29,8 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
 
 /** Public base URL for links in emails — from config, never from the request's Host header (link poisoning). */
 export function appUrl() {
-  return (process.env.APP_URL ?? "http://localhost:3100").replace(/\/$/, "");
+  // Never the request's Host header (spoofable → reset links pointing at an attacker's site).
+  // On Vercel without APP_URL, use the production domain Vercel sets for every deployment.
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return (process.env.APP_URL || (vercel ? `https://${vercel}` : "http://localhost:3100")).replace(/\/$/, "");
 }

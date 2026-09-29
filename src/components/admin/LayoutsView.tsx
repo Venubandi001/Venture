@@ -1,7 +1,8 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { readShapefile, ShapefileData, shapefileToLayout } from "./shapefileImport";
 import type { GeoJSONSource, Map as MLMap } from "maplibre-gl";
 import {
   areaM2, emptyLayout, FeatureKind, LayoutPlot, lngLatToUv, SQYD_TO_M2, subdivideBlock, UV, uvToLngLat, uvToMeters, VentureLayout,
@@ -64,6 +65,8 @@ export default function LayoutsView({
   const [realMeters, setRealMeters] = useState("");
   const [clearWhite, setClearWhite] = useState(true);
   const [featureLabel, setFeatureLabel] = useState("");
+  const [shape, setShape] = useState<ShapefileData | null>(null);
+  const [shapeField, setShapeField] = useState("");
   const [form, setForm] = useState({
     rows: 8, cols: 1, start: "1", step: 1, order: "down" as "down" | "across",
     area: "", facing: "", status: "available" as PlotStatus, zone: "",
@@ -206,6 +209,7 @@ export default function LayoutsView({
 
   async function onLayoutImage(file: File | undefined) {
     if (!file) return;
+    if (o && !o.url) return showToast("This layout was imported from a Shapefile with exact positions — a plan image would misalign it");
     try {
       setBusy("Uploading layout…");
       const { file: small, w, h } = await shrink(file, 4096, clearWhite);
@@ -223,6 +227,31 @@ export default function LayoutsView({
     } finally {
       setBusy("");
     }
+  }
+
+  async function onShapefile(file: File | undefined) {
+    if (!file) return;
+    try {
+      setBusy("Reading Shapefile…");
+      const d = await readShapefile(file);
+      setShape(d);
+      setShapeField(d.numberField);
+    } catch (e) {
+      showToast((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const shapePreview = useMemo(() => (shape && layout ? shapefileToLayout(shape, shapeField, layout) : null), [shape, shapeField, layout]);
+
+  function applyShapefile() {
+    if (!shapePreview || !layout) return;
+    if (layout.plots.length && !confirm(`Replace the current ${layout.plots.length} plots and drawn map with this Shapefile? Plots with the same number keep their status and price.`)) return;
+    fitPending.current = true;
+    edit(() => shapePreview.layout);
+    setShape(null);
+    showToast(`Imported ${shapePreview.plots} plots — check them on the map, then Save & publish`);
   }
 
   async function onGallery(files: FileList | null) {
@@ -359,7 +388,7 @@ export default function LayoutsView({
           <div className="tabs">
             {(["place", "base", "plots", "details"] as Tab[]).map((t) => (
               <button key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => { setTab(t); chooseTool("select"); }}>
-                {t === "place" ? "1 · Layout image" : t === "base" ? "2 · Roads & parks" : t === "plots" ? `3 · Plots (${layout?.plots.length ?? 0})` : "4 · Viewer details"}
+                {t === "place" ? "1 · Layout file" : t === "base" ? "2 · Roads & parks" : t === "plots" ? `3 · Plots (${layout?.plots.length ?? 0})` : "4 · Viewer details"}
               </button>
             ))}
           </div>
@@ -409,16 +438,55 @@ export default function LayoutsView({
           {layout && tab === "place" ? (
             <div className="le-stack">
               <label className="upload le-upload">
-                {o ? "Replace layout image" : "Upload layout plan"} <b>PNG / JPG / WebP</b>
+                Import Shapefile <b>.zip (.shp · .shx · .dbf · .prj)</b>
                 <br />
-                <small>Export PDFs/CAD as a high-resolution image first. Large images are resized to 4096 px.</small>
-                <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLayoutImage(e.target.files?.[0])} />
+                <small>Recommended — from the surveyor / CAD team. Plots, sizes and positions come in exactly; no tracing.</small>
+                <input type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden
+                  onChange={(e) => { onShapefile(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
-              <label className="le-check">
-                <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
-                Remove white background (shows satellite around the plots). Crop logos / legends off the plan for the cleanest look.
-              </label>
-              {o ? (
+              {shape && shapePreview ? (
+                <div className="le-box shape-preview">
+                  <b>{shape.name}</b>
+                  <small className="le-muted">{shape.shapes.length} shapes read · coordinates converted from the .prj</small>
+                  <div className="field">
+                    <label>Column with the plot number</label>
+                    <select value={shapeField} onChange={(e) => setShapeField(e.target.value)}>
+                      {shape.fields.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  <small>
+                    <b>{shapePreview.plots} plots</b> (e.g. {shapePreview.layout.plots.slice(0, 5).map((p) => p.number).join(", ") || "—"}) ·{" "}
+                    {shapePreview.features} map features
+                    {shapePreview.kept ? ` · ${shapePreview.kept} existing plots keep their status` : ""}
+                    {shapePreview.skipped ? ` · ${shapePreview.skipped} shapes skipped` : ""}
+                  </small>
+                  {shapePreview.duplicates.length ? (
+                    <small className="le-warn">Plot numbers used twice: {[...new Set(shapePreview.duplicates)].slice(0, 10).join(", ")} — fix these after import.</small>
+                  ) : null}
+                  <div className="le-row">
+                    <button className="btn ghost" onClick={() => setShape(null)}>Cancel</button>
+                    <button className="btn" onClick={applyShapefile} disabled={!shapePreview.plots}>Import {shapePreview.plots} plots</button>
+                  </div>
+                </div>
+              ) : null}
+              {o && !o.url ? (
+                <p className="le-muted">Imported from a Shapefile — positions and sizes are exact. Edit plot details in “3 · Plots”.</p>
+              ) : (
+                <>
+                  <div className="le-or">or trace a plan image</div>
+                  <label className="upload le-upload">
+                    {o ? "Replace layout image" : "Upload layout plan"} <b>PNG / JPG / WebP</b>
+                    <br />
+                    <small>Export PDFs/CAD as a high-resolution image first. Large images are resized to 4096 px.</small>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLayoutImage(e.target.files?.[0])} />
+                  </label>
+                  <label className="le-check">
+                    <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
+                    Remove white background (shows satellite around the plots). Crop logos / legends off the plan for the cleanest look.
+                  </label>
+                </>
+              )}
+              {o?.url ? (
                 <>
                   <div className="field">
                     <label>Site coordinates (from Google Maps)</label>

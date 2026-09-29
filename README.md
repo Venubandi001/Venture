@@ -65,6 +65,17 @@ APP_URL=https://yourdomain.com
 
 Security: passwords hashed with scrypt; sessions are random tokens stored hashed; changing/resetting a password signs out every device; wrong email, wrong password and deactivated accounts get the same message; login/reset/enquiry rate limits are stored in Postgres (work across servers); reset links are single-use, 30 minutes, built from `APP_URL` (never the request host).
 
+## Adding a venture's layout
+
+*Layouts & GIS → 1 · Layout file*:
+
+- **Shapefile (recommended):** a `.zip` with `.shp`, `.shx`, `.dbf` and `.prj`, from the surveyor or CAD team.
+  - The `.prj` is required. Any coordinate system works (e.g. UTM 44N).
+  - The plot-number column is detected automatically and can be changed in the preview. Facing, status and sq-yd area columns are used when present; otherwise the exact measured area is used.
+  - Parks, amenities, boundary and road-name lines are recognised from layer or attribute names. If the file has no boundary, the site outline is generated.
+  - Re-importing an updated file keeps each existing plot's status, price and zone (matched by plot number).
+- **Plan image:** upload a PNG/JPG, pin it on the satellite map, then trace the plots.
+
 ## Database
 
 - Schema: `src/server/schema.ts`. Change it, then run `npx drizzle-kit generate --name <what>` and `scripts/migrate.mjs`.

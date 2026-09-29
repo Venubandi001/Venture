@@ -7,7 +7,7 @@ export type UV = [number, number]; // position on the layout image, 0..1 from to
 export type LngLat = [number, number];
 
 export interface Overlay {
-  url: string;
+  url: string; // "" = no plan image: a frame for plots imported with real coordinates (Shapefile)
   pxWidth: number;
   pxHeight: number;
   center: LngLat;
@@ -180,7 +180,7 @@ export function parseLayout(slug: string, raw: unknown): VentureLayout | null {
   const r = raw as Record<string, unknown>;
   const o = r.overlay as Record<string, unknown> | null;
   if (o !== null) {
-    if (!o || !upload(o.url) || !num(o.pxWidth, 1) || !num(o.pxHeight, 1) || !num(o.rotation, -360, 360) ||
+    if (!o || !(o.url === "" || upload(o.url)) || !num(o.pxWidth, 1) || !num(o.pxHeight, 1) || !num(o.rotation, -360, 360) ||
         !num(o.widthMeters, 1, 20000) || !num(o.opacity, 0, 1) || !Array.isArray(o.center) ||
         !num(o.center[0], -180, 180) || !num(o.center[1], -85, 85)) return null;
   }

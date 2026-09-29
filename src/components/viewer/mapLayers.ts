@@ -235,11 +235,11 @@ export function addLayoutLayers(map: MLMap, l: VentureLayout, opts: { editor: bo
 /** Push layout edits (overlay position, base, plots, zones) into an already-built map. */
 export function syncLayout(map: MLMap, l: VentureLayout, opts: { editor: boolean }) {
   const src = map.getSource("overlay") as ImageSource | undefined;
-  if (src && (!l.overlay || src.url !== l.overlay.url)) {
+  if (src && (!l.overlay?.url || src.url !== l.overlay.url)) {
     map.removeLayer("overlay");
     map.removeSource("overlay");
   }
-  if (l.overlay) {
+  if (l.overlay?.url) {
     if (map.getSource("overlay")) (map.getSource("overlay") as ImageSource).setCoordinates(overlayCorners(l.overlay));
     else addOverlay(map, l.overlay);
     map.setPaintProperty("overlay", "raster-opacity", l.overlay.opacity);
